@@ -16,11 +16,13 @@ ext_modules = [
         "utils.cython_bbox",
         ["utils/bbox.pyx"],
         extra_compile_args=["-Wno-cpp", "-Wno-unused-function"],
+        include_dirs=[np.get_include()]
     ),
     Extension(
         "utils.cython_nms",
         ["utils/nms.pyx"],
         extra_compile_args=["-Wno-cpp", "-Wno-unused-function"],
+        include_dirs=[np.get_include()]
     )
 ]
 cmdclass.update({'build_ext': build_ext})
@@ -28,6 +30,5 @@ cmdclass.update({'build_ext': build_ext})
 setup(
     name='fast_rcnn',
     cmdclass=cmdclass,
-    ext_modules=ext_modules,
-    include_dirs=[np.get_include()]
+    ext_modules=ext_modules
 )
