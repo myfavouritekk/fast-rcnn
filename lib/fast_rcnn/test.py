@@ -178,11 +178,24 @@ def im_detect(net, im, boxes):
         blobs['rois'] = blobs['rois'][index, :]
         boxes = boxes[index, :]
 
-    # reshape network inputs
-    net.blobs['data'].reshape(*(blobs['data'].shape))
-    net.blobs['rois'].reshape(*(blobs['rois'].shape))
-    blobs_out = net.forward(data=blobs['data'].astype(np.float32, copy=False),
-                            rois=blobs['rois'].astype(np.float32, copy=False))
+    # split rois into batches to avoid memory overuse
+    batch_size = 1500
+    slice_points = np.arange(0, len(index), batch_size)[1:]
+    blobs_out = {}
+    for rois in np.split(blobs['rois'], slice_points):
+        # reshape network inputs
+        net.blobs['data'].reshape(*(blobs['data'].shape))
+        net.blobs['rois'].reshape(*rois.shape)
+        cur_blobs_out = net.forward(
+                data=blobs['data'].astype(np.float32, copy=False),
+                rois=rois.astype(np.float32, copy=False))
+        if not blobs_out:
+            blobs_out = cur_blobs_out
+        else:
+            for key in blobs_out:
+                blobs_out[key] = np.concatenate((blobs_out[key],
+                                                 cur_blobs_out[key]))
+
     if cfg.TEST.SVM:
         # use the raw scores before softmax under the assumption they
         # were trained as linear SVMs
