@@ -18,6 +18,7 @@ import cPickle
 import heapq
 from utils.blob import im_list_to_blob
 import os
+import copy
 
 def _get_image_blob(im):
     """Converts an image into a network input.
@@ -181,25 +182,27 @@ def im_detect(net, im, boxes):
     # split rois into batches to avoid memory overuse
     batch_size = 1500
     slice_points = np.arange(0, len(index), batch_size)[1:]
-    blobs_out = {}
+    blobs_out = None
+    net.blobs['data'].reshape(*(blobs['data'].shape))
     for rois in np.split(blobs['rois'], slice_points):
         # reshape network inputs
-        net.blobs['data'].reshape(*(blobs['data'].shape))
         net.blobs['rois'].reshape(*rois.shape)
         cur_blobs_out = net.forward(
                 data=blobs['data'].astype(np.float32, copy=False),
                 rois=rois.astype(np.float32, copy=False))
-        if not blobs_out:
-            blobs_out = cur_blobs_out
+        if blobs_out is None:
+            blobs_out = copy.deepcopy(cur_blobs_out)
+            blobs_out['cls_score'] = net.blobs['cls_score'].data.copy()
         else:
-            for key in blobs_out:
-                blobs_out[key] = np.concatenate((blobs_out[key],
-                                                 cur_blobs_out[key]))
+            for key in cur_blobs_out:
+                blobs_out[key] = np.r_[blobs_out[key], cur_blobs_out[key]]
+            blobs_out['cls_score'] = np.r_[blobs_out['cls_score'],
+                                           net.blobs['cls_score'].data]
 
     if cfg.TEST.SVM:
         # use the raw scores before softmax under the assumption they
         # were trained as linear SVMs
-        scores = net.blobs['cls_score'].data
+        scores = blobs_out['cls_score']
     else:
         # use softmax estimated probabilities
         scores = blobs_out['cls_prob']
