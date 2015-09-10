@@ -181,7 +181,7 @@ def im_detect(net, im, boxes):
 
     # split rois into batches to avoid memory overuse
     batch_size = 1500
-    slice_points = np.arange(0, len(index), batch_size)[1:]
+    slice_points = np.arange(0, len(boxes), batch_size)[1:]
     blobs_out = None
     net.blobs['data'].reshape(*(blobs['data'].shape))
     for rois in np.split(blobs['rois'], slice_points):
@@ -192,11 +192,13 @@ def im_detect(net, im, boxes):
                 rois=rois.astype(np.float32, copy=False))
         if blobs_out is None:
             blobs_out = copy.deepcopy(cur_blobs_out)
-            blobs_out['cls_score'] = net.blobs['cls_score'].data.copy()
+            if 'cls_score' not in cur_blobs_out:
+                blobs_out['cls_score'] = net.blobs['cls_score'].data.copy()
         else:
             for key in cur_blobs_out:
                 blobs_out[key] = np.r_[blobs_out[key], cur_blobs_out[key]]
-            blobs_out['cls_score'] = np.r_[blobs_out['cls_score'],
+            if 'cls_score' not in cur_blobs_out:
+                blobs_out['cls_score'] = np.r_[blobs_out['cls_score'],
                                            net.blobs['cls_score'].data]
 
     if cfg.TEST.SVM:
